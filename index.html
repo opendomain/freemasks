@@ -1,1 +1,23 @@
-FreeMasks.com
+<html>
+  <head>
+    <title>FreeMasks.com</title>
+    <script>
+      function ContentLoaded() {
+        checkSSL();
+      }
+      
+      function checkSSL(){
+        if (window.location.protocol != 'https:') {
+          location.replace(`https:${location.href.substring(location.protocol.length)}`);
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <p>Free Masks</p>
+    <script>
+      document.addEventListener("DOMContentLoaded", ContentLoaded);
+    </script>
+  </body>
+</html>
+

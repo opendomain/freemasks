@@ -5,31 +5,24 @@
       function ContentLoaded() {
         checkSSL();
       }
-      
-      function checkID() {
-        
-      }
-      
-      function checkSSL(){
-        if (window.location.protocol != 'https:') {
-          location.replace(`https:${location.href.substring(location.protocol.length)}`);
+            
+      function checkSSL() {
+        var loc = window.location;
+        if (loc.protocol != 'https:' && loc.hostname != 'localhost') {
+          var newLoc = 'https://' + loc.hostname;
+          if (loc.port != '80') {
+            newLoc += ":" + loc.port;
+          }
+          newLoc += loc.pathname + loc.search + loc.hash;
+          window.location.replace(newLoc);
         }
-      }
-      
-      function getUrlParameter(name) {
-        name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
-        var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
-        var results = regex.exec(location.search);
-        return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
-      }
+      }      
     </script>
   </head>
   <body>
     <p>Free Masks</p>
-    <p>Hello Doreen from HN!</p>
     <script>
       document.addEventListener("DOMContentLoaded", ContentLoaded);
     </script>
   </body>
 </html>
-

@@ -1,28 +1,631 @@
+<!DOCTYPE html>
 <html>
-  <head>
-    <title>FreeMasks.com</title>
+<head>
+    <meta charset="utf-8" />
+    <title>TRiangles with Data Structures</title>
     <script>
-      function ContentLoaded() {
-        checkSSL();
-      }
-            
-      function checkSSL() {
-        var loc = window.location;
-        if (loc.protocol != 'https:' && loc.hostname != 'localhost') {
-          var newLoc = 'https://' + loc.hostname;
-          if (loc.port != '80') {
-            newLoc += ":" + loc.port;
-          }
-          newLoc += loc.pathname + loc.search + loc.hash;
-          window.location.replace(newLoc);
+        "use strict";
+
+        //const _numScreens = 6;
+        const _numCols = 4;
+        const _numRows = 2;
+
+        const _numRotations = 4;
+
+        var _cubeWorld;
+        var _baseCopy;
+
+        const _xOffset = 5;
+        const _yOffset = 5;
+        const _size = 100;
+        const _half = Math.ceil(_size / 2);
+        const _cubeSpace = 5;
+        const _lineWidth = 1;
+
+        var _maxSearchNonBlankFace = 1;
+
+        const TRIANGLE_BITS = {
+            "North": 0x01,
+            "East": 0x02,
+            "South": 0x04,
+            "West": 0x08
+        };
+
+        const _faceColors = [
+            //            "aqua",
+            "black",
+            "blue",
+            "fuchsia",
+            "gray",
+            "green",
+            "lime",
+            "maroon",
+            "navy",
+            "olive",
+            "orange",
+            "purple",
+            "red",
+            "silver",
+            "teal",
+            "white",
+            "yellow"
+        ];
+
+        const _numFaceColors = _faceColors.length;
+
+        const _goodFaces = {
+            "blank": 0,
+            "triangle_topLeft": 1,
+            "triangle_topRight": 2,
+            "triangle_bottomRight": 3,
+            "triangle_bottomLeft": 4,
+            "block": 5,
+            "rectangle_left": 6,
+            "rectangle_top": 7,
+            "rectangle_right": 8,
+            "rectangle_bottom": 9,
+        };
+
+        const _numGoodFaces = Object.keys(_goodFaces).length;
+
+        const _triangleName = {
+            "blank": 0,
+            "topRight": 1,
+            "bottomRight": 2,
+            "bottomLeft": 3,
+            "topLeft": 4,
+            "block": 5
+        };
+
+        const _numStampsInRowOrCol = 2;
+
+        function init() {
+            getCanvas();
+
+            var elemRotate = document.getElementById("selNumRotate");
+            _maxSearchNonBlankFace = elemRotate.options[elemRotate.selectedIndex].value;
+
+            _baseCopy = JSON.parse(JSON.stringify(_baseset));
+
+            //_cubeWorld = new CubeWorld();
+            //let screen = _cubeWorld.getScreen(screenNum);
+            //loadScreen(screen, _numCols, _numRows);
+
+            let screenId = 0;
+            let screen = new Screen(screenId, _numCols, _numRows);
+
+            loadScreen(screen);
+
+            screen.display();
         }
-      }      
+
+        function CubeWorld(numScreens) {
+            numScreens = numScreens || _numScreens;
+            let screens = [];
+
+            for (let s = 0; s < numScreens; s++) {
+                let newScreen = new Screen(s);
+                screens.push(newScreen);
+            }
+
+            this.getScreen = function (screenNum) {
+                return screens[screenNum];
+            }
+
+            return this;
+        }
+
+        function Screen(id, width, height) {
+            var screen = {
+                width: undefined,
+                height: undefined
+            };
+
+            this.faces = undefined;
+
+            this.id = id;
+
+            this.init = function (width, height) {
+                screen.width = (width);
+                screen.height = (height);
+
+                let newFaces = [];
+
+                for (let r = 0; r < screen.height; r++) {
+                    let newRow = [];
+                    for (let c = 0; c < screen.width; c++) {
+                        let newFace = new Face(c, r);
+                        newRow.push(newFace);
+                    }
+                    newFaces.push(newRow);
+                }
+                this.faces = newFaces;
+            };
+
+            this.getWidth = function () {
+                return (screen.width);
+            };
+
+            this.getHeight = function () {
+                return (screen.height);
+            };
+
+            this.getFace = function (col, row) {
+                let faceRow = this.faces[row];
+                let fce = faceRow[col];
+                return fce;
+            }
+
+            this.display = function () {
+                let triangleString;
+                let centerPoint;
+
+                let lineColorOutline = "black";
+                let fillColorOutline = "";
+
+                let lineColor = "white";
+                let fillColor = "green";
+
+                let outlinePoints;
+                let trianglePoints;
+
+                for (let row = 0; row < screen.height; row++) {
+                    for (let col = 0; col < screen.width; col++) {
+                        let face = this.getFace(col, row);
+                        fillColor = face.color;
+                        for (let x = 0; x < _numStampsInRowOrCol; x++) {
+                            for (let y = 0; y < _numStampsInRowOrCol; y++) {
+                                let stampNum = face.getStampNum(x, y);
+
+                                centerPoint = calculateCenterPoint(col, row, x, y);
+
+                                outlinePoints = makeOutlinePoints(centerPoint);
+                                drawShape(outlinePoints, lineColorOutline, fillColorOutline);
+
+                                triangleString = getTriangleString(stampNum);
+                                trianglePoints = makeTrianglePoints(triangleString, centerPoint);
+                                drawShape(trianglePoints, lineColor, fillColor);
+                            }
+                        }
+                    }
+                }
+            }
+
+            this.init(width, height);
+
+            return this;
+        }
+
+        function Face(col, row) {
+            this.col = col;
+            this.row = row;
+            this.color = undefined;
+
+            this.stamps = undefined;
+
+            this.init = function () {
+                let newStamps = []; 
+                for (let r = 0; r < _numStampsInRowOrCol; r++) {
+                    let newRow = [];
+                    for (let c = 0; c < _numStampsInRowOrCol; c++) {
+                        let newStamp = new Stamp(c, r);
+                        newRow.push(newStamp);
+                    }
+                    newStamps.push(newRow);
+                }
+                this.stamps = newStamps;
+            };
+
+            this.getStampNum = function (x, y) {
+                let stampRow = this.stamps[y];
+                let stmp = stampRow[x];
+                return stmp.stampNum;
+            };
+
+            this.setStampNum = function (x, y, num) {
+                if (typeof (num) == 'undefined') alert('Invalid stampNum');
+                let stampRow = this.stamps[y];
+                let stmp = stampRow[x];
+                stmp.stampNum = num;
+            };
+
+            this.init();
+
+            return this;
+        }
+
+        function Stamp(x, y) {
+            this.x = x;
+            this.y = y;
+            this.stampNum = undefined;
+            return this;
+        }
+
+        function loadScreen(screen) {
+            let faceNum = 0;
+            let numCubes;
+            let randCubeNum;
+            let cube;
+            let numFaces;
+            let cubeFaceImage;
+            let faceStampNum;
+            let rotation;
+
+            let faceColorNum;
+            let faceColor;
+
+            let cubeFace;
+
+            let numCols = screen.getWidth();
+            let numRows = screen.getHeight();
+
+            for (let row = 0; row < numRows; row++) {
+                for (let col = 0; col < numCols; col++) {
+                    let face = screen.getFace(col, row);
+
+                    numCubes = _baseCopy.cubes.length;
+                    randCubeNum = Math.floor(Math.random() * numCubes);
+                    cube = _baseCopy.cubes.splice(randCubeNum, 1)[0];
+
+                    numFaces = cube.faces.length;
+                    faceNum = Math.floor(Math.random() * numFaces);
+                    let numSearchNonBlankFace = 0;
+                    let faceNumMod = 0;
+                    do {
+                        faceNumMod = (faceNum + numSearchNonBlankFace) % numFaces;
+                        cubeFace = cube.faces[faceNumMod];
+                        cubeFaceImage = cubeFace.image;
+
+                        if (cubeFaceImage != "blank") {
+                            break;
+                        }
+                        numSearchNonBlankFace++;
+                    } while (numSearchNonBlankFace < _maxSearchNonBlankFace);
+
+                    faceColorNum = Math.floor(Math.random() * _numFaceColors);
+                    faceColor = _faceColors[faceColorNum];
+                    face.color = faceColor;
+                    face.color = cubeFace.color;
+
+                    rotation = Math.floor(Math.random() * _numRotations) * 90;
+                    rotation = cubeFace.imageOrientation;
+
+                    faceStampNum = getFaceNumFromImage(cubeFaceImage, rotation);
+
+                    setFaceStamps(face, faceStampNum);
+                }
+            }
+
+            return screen;
+        }
+
+        function getFaceNumFromImage(faceImage, rotation) {
+            let faceStampNum = 0;
+
+            switch (faceImage) {
+                case "blank":
+                    faceStampNum = _goodFaces.blank;
+                    break;
+
+                case "block":
+                    faceStampNum = _goodFaces.block;
+                    break;
+
+                case "triangle":
+                    switch (rotation) {
+                        case 0:
+                            faceStampNum = _goodFaces.triangle_bottomLeft;
+                            break;
+
+                        case 90:
+                            faceStampNum = _goodFaces.triangle_topLeft;
+                            break;
+
+                        case 180:
+                            faceStampNum = _goodFaces.triangle_topRight;
+                            break;
+
+                        case 270:
+                            faceStampNum = _goodFaces.triangle_bottomRight;
+                            break;
+
+                        default:
+                            alert('Invalid triangle rotation');
+                            faceStampNum = 0;
+                            break;
+                    }
+                    break;
+
+                case "half":
+                    switch (rotation) {
+                        case 0:
+                            faceStampNum = _goodFaces.rectangle_bottom;
+                            break;
+
+                        case 90:
+                            faceStampNum = _goodFaces.rectangle_left;
+                            break;
+
+                        case 180:
+                            faceStampNum = _goodFaces.rectangle_top;
+                            break;
+
+                        case 270:
+                            faceStampNum = _goodFaces.rectangle_right;
+                            break;
+
+                        default:
+                            alert('Invalid rectangle rotation');
+                            faceStampNum = 0;
+                            break;
+                    }
+                    break;
+
+                default:
+                    alert('Invalid face image');
+                    faceStampNum = 0;
+                    break;
+            }
+
+            return faceStampNum;
+
+        }
+
+        function setFaceStamps(face, faceNum) {
+            let stamp;
+            switch (faceNum) {
+                case _goodFaces.blank:
+                    face.setStampNum(0, 0, _triangleName.blank);
+                    face.setStampNum(0, 1, _triangleName.blank);
+                    face.setStampNum(1, 0, _triangleName.blank);
+                    face.setStampNum(1, 1, _triangleName.blank);
+
+                    break;
+
+                case _goodFaces.block:
+                    face.setStampNum(0, 0, _triangleName.block);
+                    face.setStampNum(0, 1, _triangleName.block);
+                    face.setStampNum(1, 0, _triangleName.block);
+                    face.setStampNum(1, 1, _triangleName.block);
+
+                    break;
+
+                case _goodFaces.triangle_topLeft:
+                    face.setStampNum(0, 0, _triangleName.block);
+                    face.setStampNum(0, 1, _triangleName.topLeft);
+                    face.setStampNum(1, 0, _triangleName.topLeft);
+                    face.setStampNum(1, 1, _triangleName.blank);
+                    break;
+
+                case _goodFaces.triangle_topRight:
+                    face.setStampNum(0, 0, _triangleName.topRight);
+                    face.setStampNum(0, 1, _triangleName.blank);
+                    face.setStampNum(1, 0, _triangleName.block);
+                    face.setStampNum(1, 1, _triangleName.topRight);
+                    break;
+
+                case _goodFaces.triangle_bottomRight:
+                    face.setStampNum(0, 0, _triangleName.blank);
+                    face.setStampNum(0, 1, _triangleName.bottomRight);
+                    face.setStampNum(1, 0, _triangleName.bottomRight);
+                    face.setStampNum(1, 1, _triangleName.block);
+                    break;
+
+                case _goodFaces.triangle_bottomLeft:
+                    face.setStampNum(0, 0, _triangleName.bottomLeft);
+                    face.setStampNum(0, 1, _triangleName.block);
+                    face.setStampNum(1, 0, _triangleName.blank);
+                    face.setStampNum(1, 1, _triangleName.bottomLeft);
+                    break;
+
+                case _goodFaces.rectangle_left:
+                    face.setStampNum(0, 0, _triangleName.block);
+                    face.setStampNum(0, 1, _triangleName.blank);
+                    face.setStampNum(1, 0, _triangleName.block);
+                    face.setStampNum(1, 1, _triangleName.blank);
+                    break;
+
+                case _goodFaces.rectangle_top:
+                    face.setStampNum(0, 0, _triangleName.block);
+                    face.setStampNum(0, 1, _triangleName.block);
+                    face.setStampNum(1, 0, _triangleName.blank);
+                    face.setStampNum(1, 1, _triangleName.blank);
+                    break;
+
+                case _goodFaces.rectangle_right:
+                    face.setStampNum(0, 0, _triangleName.blank);
+                    face.setStampNum(0, 1, _triangleName.block);
+                    face.setStampNum(1, 0, _triangleName.blank);
+                    face.setStampNum(1, 1, _triangleName.block);
+                    break;
+
+                case _goodFaces.rectangle_bottom:
+                    face.setStampNum(0, 0, _triangleName.blank);
+                    face.setStampNum(0, 1, _triangleName.blank);
+                    face.setStampNum(1, 0, _triangleName.block);
+                    face.setStampNum(1, 1, _triangleName.block);
+                    break;
+
+                default:
+                    alert('Invalid faceNum in setFaceStamps');
+                    break;
+            }
+
+        }
     </script>
-  </head>
-  <body>
-    <p>Free Masks</p>
     <script>
-      document.addEventListener("DOMContentLoaded", ContentLoaded);
+        "use strict";
+
+        var _cachedTriangleString = [];
+        function getTriangleString(triangleNum) {
+            let triangleString = _cachedTriangleString[triangleNum];
+
+            if (triangleString !== undefined) {
+                return triangleString;
+            }
+
+            switch (triangleNum) {
+                case _triangleName.blank:
+                    triangleString = "";
+                    break;
+
+                case _triangleName.topRight:
+                    triangleString = "NE";
+                    break;
+
+                case _triangleName.bottomRight:
+                    triangleString = "ES";
+                    break;
+
+                case _triangleName.bottomLeft:
+                    triangleString = "SW";
+                    break;
+
+                case _triangleName.topLeft:
+                    triangleString = "NW";
+                    break;
+
+                case _triangleName.block:
+                    triangleString = "NESW";
+                    break;
+
+                default:
+                    alert('invalid triangleNum in getTriangleString');
+                    triangleString = "";
+                    break;
+
+            }
+
+            //triangleString = "";
+            //if ((triangleNum & TRIANGLE_BITS.North) == TRIANGLE_BITS.North) triangleString += "N";
+            //if ((triangleNum & TRIANGLE_BITS.East) == TRIANGLE_BITS.East) triangleString += "E";
+            //if ((triangleNum & TRIANGLE_BITS.South) == TRIANGLE_BITS.South) triangleString += "S";
+            //if ((triangleNum & TRIANGLE_BITS.West) == TRIANGLE_BITS.West) triangleString += "W";
+
+            _cachedTriangleString[triangleNum] = triangleString;
+
+            return triangleString;
+        }
+
+        function calculateCenterPoint(xCol, yRow, stampX, stampY) {
+            let centerPoint = new point();
+
+            centerPoint.x = (_size * xCol * _numStampsInRowOrCol) + (_size * stampX) + (_cubeSpace * xCol) + _half + _xOffset;
+            centerPoint.y = (_size * yRow * _numStampsInRowOrCol) + (_size * stampY) + (_cubeSpace * yRow) + _half + _yOffset;
+
+            return centerPoint;
+        }
+
+        function makeOutlinePoints(centerPoint) {
+            let points = [];
+
+            let centerX = centerPoint.x;
+            let centerY = centerPoint.y;
+
+            points.push(new point(centerX - _half, centerY - _half));
+            points.push(new point(centerX + _half, centerY - _half));
+            points.push(new point(centerX + _half, centerY + _half));
+            points.push(new point(centerX - _half, centerY + _half));
+            //points.push(new point(centerX - _half, centerY - _half));
+
+            return points;
+        }
+
+        function makeTrianglePoints(triangles, centerPoint) {
+            let points = [];
+
+            let centerX = centerPoint.x;
+            let centerY = centerPoint.y;
+
+            if (triangles.includes("N")) {
+                points.push(new point(centerX, centerY));
+                points.push(new point(centerX - _half, centerY - _half));
+                points.push(new point(centerX + _half, centerY - _half));
+                //points.push(new point(centerX, centerY));
+            }
+
+            if (triangles.includes("E")) {
+                points.push(new point(centerX, centerY));
+                points.push(new point(centerX + _half, centerY - _half));
+                points.push(new point(centerX + _half, centerY + _half));
+                //points.push(new point(centerX, centerY));
+            }
+
+            if (triangles.includes("S")) {
+                points.push(new point(centerX, centerY));
+                points.push(new point(centerX + _half, centerY + _half));
+                points.push(new point(centerX - _half, centerY + _half));
+                //points.push(new point(centerX, centerY));
+            }
+
+            if (triangles.includes("W")) {
+                points.push(new point(centerX, centerY));
+                points.push(new point(centerX - _half, centerY + _half));
+                points.push(new point(centerX - _half, centerY - _half));
+                //points.push(new point(centerX, centerY));
+            }
+
+            return points;
+        }
+
+        function drawShape(points, lineColour, fillColour) {
+            let currPoint;
+
+            let xPos;
+            let yPos;
+
+            if ((lineColour === undefined) || (lineColour == "")) lineColour = "black";
+            if ((fillColour === undefined) || (fillColour == "")) fillColour = "clear";
+
+            _ctx.strokeStyle = lineColour;
+            _ctx.lineWidth = _lineWidth;
+            _ctx.beginPath();
+            for (let pNum = 0; pNum < points.length; pNum++) {
+                currPoint = points[pNum];
+                xPos = currPoint.x;
+                yPos = currPoint.y;
+
+                if (pNum == 0) {
+                    _ctx.moveTo(xPos, yPos);
+                } else {
+                    _ctx.lineTo(xPos, yPos);
+                }
+            }
+            _ctx.closePath();
+            _ctx.stroke();
+
+            if (fillColour != "clear") {
+                _ctx.fillStyle = fillColour;
+                _ctx.fill();
+            }
+        }
+
+        function point(x, y) {
+            this.x = x;
+            this.y = y;
+            return this;
+        }
     </script>
-  </body>
+    <script src="script/canvas.js"></script>
+    <script src="cubes.js"></script>
+</head>
+<body>
+    <div>
+        <span>Max Number of Rotations to skip BLANK faces:</span>
+        <select id="selNumRotate">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+        </select>
+        <button onclick="init();">Generate</button>
+    </div>
+    <div>
+        <canvas id="canvasElem" width="1100" height="1100"></canvas>
+    </div>
+    <script>init()</script>
+
+</body>
 </html>

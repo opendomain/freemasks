@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>TRiangles with Data Structures</title>
+    <title>Cube: Find Groups</title>
     <script>
         "use strict";
 
@@ -11,6 +11,8 @@
         const _numRows = 2;
 
         const _numRotations = 4;
+
+        const _numPiecesInStamp = 4;
 
         var _cubeWorld;
         var _baseCopy;
@@ -29,6 +31,14 @@
             "East": 0x02,
             "South": 0x04,
             "West": 0x08
+        };
+
+        const TRIANGLE_POS = {
+            "NotSet": -1,
+            "North": 0,
+            "East": 1,
+            "South": 2,
+            "West": 3
         };
 
         const _faceColors = [
@@ -79,24 +89,53 @@
 
         const _numStampsInRowOrCol = 2;
 
+        var _mainScreen;
+
         function init() {
             getCanvas();
 
             var elemRotate = document.getElementById("selNumRotate");
             _maxSearchNonBlankFace = elemRotate.options[elemRotate.selectedIndex].value;
 
-            _baseCopy = JSON.parse(JSON.stringify(_baseset));
+            _baseCopy = clone(_baseset);
 
             //_cubeWorld = new CubeWorld();
             //let screen = _cubeWorld.getScreen(screenNum);
             //loadScreen(screen, _numCols, _numRows);
 
             let screenId = 0;
-            let screen = new Screen(screenId, _numCols, _numRows);
+            _mainScreen = new Screen(screenId, _numCols, _numRows);
 
-            loadScreen(screen);
+            loadScreen(_mainScreen);
 
-            screen.display();
+            _mainScreen.display(false);
+        }
+
+        function clone(objIn) {
+            if (!objIn) {
+                alert('Invalid Clone - In');
+            }
+
+            let objInStr = JSON.stringify(objIn);
+            var newObj = JSON.parse(objInStr);
+
+            if (!newObj) {
+                alert('Invalid Clone - Out');
+            }
+            return newObj;
+        }
+
+        var _numMsg = 0;
+        var _MAX_NUM_MSG = 3;
+        var _lastsMsg = "";
+        function log(msg) {
+            if (msg == _lastsMsg) return;
+            _lastsMsg = msg;
+            if (_numMsg <= _MAX_NUM_MSG) {
+                _numMsg++;
+                alert(msg);
+            }
+            console.log(msg);
         }
 
         function CubeWorld(numScreens) {
@@ -116,18 +155,17 @@
         }
 
         function Screen(id, width, height) {
-            var screen = {
+            let screen = {
                 width: undefined,
-                height: undefined
+                height: undefined,
+                faces: []
             };
-
-            this.faces = undefined;
 
             this.id = id;
 
             this.init = function (width, height) {
-                screen.width = (width);
-                screen.height = (height);
+                screen.width = width;
+                screen.height = height;
 
                 let newFaces = [];
 
@@ -139,7 +177,8 @@
                     }
                     newFaces.push(newRow);
                 }
-                this.faces = newFaces;
+
+                screen.faces = newFaces;
             };
 
             this.getWidth = function () {
@@ -151,12 +190,18 @@
             };
 
             this.getFace = function (col, row) {
-                let faceRow = this.faces[row];
+                let faceRow = screen.faces[row];
+                if (!faceRow) {
+                    alert('Invalid Face row');
+                }
                 let fce = faceRow[col];
+                if (!fce) {
+                    alert('Invalid Face col');
+                }
                 return fce;
-            }
+            };
 
-            this.display = function () {
+            this.display = function (showSecondColor) {
                 let triangleString;
                 let centerPoint;
 
@@ -172,18 +217,24 @@
                 for (let row = 0; row < screen.height; row++) {
                     for (let col = 0; col < screen.width; col++) {
                         let face = this.getFace(col, row);
-                        fillColor = face.color;
                         for (let x = 0; x < _numStampsInRowOrCol; x++) {
                             for (let y = 0; y < _numStampsInRowOrCol; y++) {
-                                let stampNum = face.getStampNum(x, y);
-
                                 centerPoint = calculateCenterPoint(col, row, x, y);
 
                                 outlinePoints = makeOutlinePoints(centerPoint);
                                 drawShape(outlinePoints, lineColorOutline, fillColorOutline);
 
-                                triangleString = getTriangleString(stampNum);
+                                //let stampNum = face.getStampNum(x, y);
+                                //triangleString = getTriangleString(stampNum);
+
+                                triangleString = face.getTriangles(x, y);
                                 trianglePoints = makeTrianglePoints(triangleString, centerPoint);
+
+                                fillColor = face.color;
+                                if (showSecondColor) {
+                                    // Zedric use group color
+                                    fillColor = face.color;
+                                }
                                 drawShape(trianglePoints, lineColor, fillColor);
                             }
                         }
@@ -201,10 +252,25 @@
             this.row = row;
             this.color = undefined;
 
-            this.stamps = undefined;
+            let face = {
+                stamps: []
+            };
+
+
+            function getStamp(x, y) {
+                let stampRow = face.stamps[y];
+                if (!stampRow) {
+                    alert('Invalid stampRow');
+                }
+                let stmp = stampRow[x];
+                if (!stmp) {
+                    alert("Invalid getStamp");
+                }
+                return stmp;
+            }
 
             this.init = function () {
-                let newStamps = []; 
+                let newStamps = [];
                 for (let r = 0; r < _numStampsInRowOrCol; r++) {
                     let newRow = [];
                     for (let c = 0; c < _numStampsInRowOrCol; c++) {
@@ -213,20 +279,37 @@
                     }
                     newStamps.push(newRow);
                 }
-                this.stamps = newStamps;
+                face.stamps = newStamps;
             };
 
             this.getStampNum = function (x, y) {
-                let stampRow = this.stamps[y];
-                let stmp = stampRow[x];
+                let stmp = getStamp(x, y);
                 return stmp.stampNum;
             };
 
             this.setStampNum = function (x, y, num) {
-                if (typeof (num) == 'undefined') alert('Invalid stampNum');
-                let stampRow = this.stamps[y];
-                let stmp = stampRow[x];
+                if (typeof (num) != 'number') log('Invalid stampNum');
+                let stmp = getStamp(x, y);
                 stmp.stampNum = num;
+                stmp.triangles = getTriangleString(num);
+            };
+
+            this.getTriangles = function (x, y) {
+                let stmp = getStamp(x, y);
+                return stmp.triangles;
+            };
+
+            this.getStampVisited = function (x, y, p) {
+                let stmp = getStamp(x, y);
+                let piece = stmp.pieces[p];
+                return piece.visited;
+            };
+
+            this.setStampVisited = function (x, y, p, visited) {
+                if (typeof (visited) != 'boolean') log('Invalid visited type');
+                let stmp = getStamp(x, y);
+                let piece = stmp.pieces[p];
+                piece.visited = visited;
             };
 
             this.init();
@@ -237,7 +320,27 @@
         function Stamp(x, y) {
             this.x = x;
             this.y = y;
+            this.pieces = [];
             this.stampNum = undefined;
+            this.triangles = "";
+
+            this.init = function () {
+                this.pieces = [];
+                for (let p = 0; p < _numPiecesInStamp; p++) {
+                    let newPiece = new Piece(p);
+                    this.pieces.push(newPiece);
+                }
+            };
+
+            this.init();
+
+            return this;
+        }
+
+        function Piece(num) {
+            this.pieceNum = num;
+            //this.isOn = false;
+            this.visited = undefined;
             return this;
         }
 
@@ -330,7 +433,7 @@
                             break;
 
                         default:
-                            alert('Invalid triangle rotation');
+                            log('Invalid triangle rotation');
                             faceStampNum = 0;
                             break;
                     }
@@ -355,14 +458,14 @@
                             break;
 
                         default:
-                            alert('Invalid rectangle rotation');
+                            log('Invalid rectangle rotation');
                             faceStampNum = 0;
                             break;
                     }
                     break;
 
                 default:
-                    alert('Invalid face image');
+                    log('Invalid face image');
                     faceStampNum = 0;
                     break;
             }
@@ -447,7 +550,7 @@
                     break;
 
                 default:
-                    alert('Invalid faceNum in setFaceStamps');
+                    log('Invalid faceNum in setFaceStamps');
                     break;
             }
 
@@ -490,7 +593,7 @@
                     break;
 
                 default:
-                    alert('invalid triangleNum in getTriangleString');
+                    log('invalid triangleNum in getTriangleString');
                     triangleString = "";
                     break;
 
@@ -508,7 +611,7 @@
         }
 
         function calculateCenterPoint(xCol, yRow, stampX, stampY) {
-            let centerPoint = new point();
+            let centerPoint = new Point();
 
             centerPoint.x = (_size * xCol * _numStampsInRowOrCol) + (_size * stampX) + (_cubeSpace * xCol) + _half + _xOffset;
             centerPoint.y = (_size * yRow * _numStampsInRowOrCol) + (_size * stampY) + (_cubeSpace * yRow) + _half + _yOffset;
@@ -522,11 +625,11 @@
             let centerX = centerPoint.x;
             let centerY = centerPoint.y;
 
-            points.push(new point(centerX - _half, centerY - _half));
-            points.push(new point(centerX + _half, centerY - _half));
-            points.push(new point(centerX + _half, centerY + _half));
-            points.push(new point(centerX - _half, centerY + _half));
-            //points.push(new point(centerX - _half, centerY - _half));
+            points.push(new Point(centerX - _half, centerY - _half));
+            points.push(new Point(centerX + _half, centerY - _half));
+            points.push(new Point(centerX + _half, centerY + _half));
+            points.push(new Point(centerX - _half, centerY + _half));
+            //points.push(new Point(centerX - _half, centerY - _half));
 
             return points;
         }
@@ -538,31 +641,31 @@
             let centerY = centerPoint.y;
 
             if (triangles.includes("N")) {
-                points.push(new point(centerX, centerY));
-                points.push(new point(centerX - _half, centerY - _half));
-                points.push(new point(centerX + _half, centerY - _half));
-                //points.push(new point(centerX, centerY));
+                points.push(new Point(centerX, centerY));
+                points.push(new Point(centerX - _half, centerY - _half));
+                points.push(new Point(centerX + _half, centerY - _half));
+                //points.push(new Point(centerX, centerY));
             }
 
             if (triangles.includes("E")) {
-                points.push(new point(centerX, centerY));
-                points.push(new point(centerX + _half, centerY - _half));
-                points.push(new point(centerX + _half, centerY + _half));
-                //points.push(new point(centerX, centerY));
+                points.push(new Point(centerX, centerY));
+                points.push(new Point(centerX + _half, centerY - _half));
+                points.push(new Point(centerX + _half, centerY + _half));
+                //points.push(new Point(centerX, centerY));
             }
 
             if (triangles.includes("S")) {
-                points.push(new point(centerX, centerY));
-                points.push(new point(centerX + _half, centerY + _half));
-                points.push(new point(centerX - _half, centerY + _half));
-                //points.push(new point(centerX, centerY));
+                points.push(new Point(centerX, centerY));
+                points.push(new Point(centerX + _half, centerY + _half));
+                points.push(new Point(centerX - _half, centerY + _half));
+                //points.push(new Point(centerX, centerY));
             }
 
             if (triangles.includes("W")) {
-                points.push(new point(centerX, centerY));
-                points.push(new point(centerX - _half, centerY + _half));
-                points.push(new point(centerX - _half, centerY - _half));
-                //points.push(new point(centerX, centerY));
+                points.push(new Point(centerX, centerY));
+                points.push(new Point(centerX - _half, centerY + _half));
+                points.push(new Point(centerX - _half, centerY - _half));
+                //points.push(new Point(centerX, centerY));
             }
 
             return points;
@@ -600,7 +703,7 @@
             }
         }
 
-        function point(x, y) {
+        function Point(x, y) {
             this.x = x;
             this.y = y;
             return this;
@@ -608,6 +711,305 @@
     </script>
     <script src="script/canvas.js"></script>
     <script src="cubes.js"></script>
+    <script>
+        "use strict";
+
+        function findAllGroups() {
+            let numCols = _mainScreen.getWidth();
+            let numRows = _mainScreen.getHeight();
+
+            for (let row = 0; row < numRows; row++) {
+                for (let col = 0; col < numCols; col++) {
+
+                    let face = _mainScreen.getFace(col, row);
+
+                    for (let x = 0; x < _numStampsInRowOrCol; x++) {
+                        for (let y = 0; y < _numStampsInRowOrCol; y++) {
+
+                            for (let piece = 0; piece < _numPiecesInStamp; piece++) {
+
+                                face.setStampVisited(x, y, piece, false);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let grpData = new GroupData(numCols, numRows);
+            _loopNum = 0;
+
+            for (let row = 0; row < numRows; row++) {
+                for (let col = 0; col < numCols; col++) {
+
+                    for (let x = 0; x < _numStampsInRowOrCol; x++) {
+                        for (let y = 0; y < _numStampsInRowOrCol; y++) {
+
+                            for (let piece = 0; piece < _numPiecesInStamp; piece++) {
+
+                                grpData.isNewGroup = true;
+
+                                let currStamp = new StampPos();
+                                currStamp.col = col;
+                                currStamp.row = row;
+                                currStamp.x = x;
+                                currStamp.y = y;
+                                currStamp.piece = piece;
+
+                                //console.log(currStamp);
+                                findGroups(_mainScreen, grpData, currStamp);
+                            }
+                        }
+                    }
+                }
+            }
+
+            console.log("----------------");
+            console.log(grpData);
+        }
+
+        function stampCheckHash(currStamp) {
+            let stmpHash = "";
+            stmpHash += "C" + currStamp.col;
+            stmpHash += "R" + currStamp.row;
+            stmpHash += "x" + currStamp.x;
+            stmpHash += "y" + currStamp.y;
+            stmpHash += "p" + currStamp.piece;
+
+            return stmpHash;
+        }
+
+        var _loopNum = 0;
+
+        function findGroups(screen, grpData, currStamp) {
+            console.log("loop: " + _loopNum++);
+            console.log(grpData);
+
+            var  face = screen.getFace(currStamp.col, currStamp.row);
+            var  visited = face.getStampVisited(currStamp.x, currStamp.y, currStamp.piece);
+
+            if (!visited) {
+                visited = true;
+                face.setStampVisited(currStamp.x, currStamp.y, currStamp.piece, visited);
+
+                var  triangleString = face.getTriangles(currStamp.x, currStamp.y);
+                var  pieceNum = currStamp.piece;
+                var  currentTriangleIsOn = filterTrianglePos(triangleString, pieceNum);
+
+                if (currentTriangleIsOn) {
+                    grpData.addStampToGroup(currStamp);
+
+                    var  nextStampPosList = getNextStampPieces(currStamp, grpData.numCols, grpData.numRows);
+                    if (nextStampPosList == null) return;
+
+                    for (var stmp = 0; stmp < nextStampPosList.length; stmp++) {
+                        var nextStamp = nextStampPosList[stmp];
+                        if (!nextStamp) {
+                            alert('Invalid next stamp');
+                        }
+                        findGroups(screen, grpData, nextStamp);
+                    }
+                }
+            }
+
+            _loopNum--;
+
+        }
+
+        function getNextStampPieces(currStamp, maxCols, maxRows) {
+            let nextStampPos = null;
+            let nextStampPieces = [];
+
+            let currPiece = currStamp.piece;
+
+            switch (currPiece) {
+                case TRIANGLE_POS.North:
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.West;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.East;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.South;
+                    if (currStamp.y > 0) {
+                        nextStampPos.y--;
+                    } else {
+                        if (currStamp.row > 0) {
+                            nextStampPos.row--;
+                            nextStampPos.y = 1;
+                        } else {
+                            nextStampPos = null;
+                        }
+                    }
+                    if (nextStampPos) nextStampPieces.push(nextStampPos);
+                    break;
+
+                case TRIANGLE_POS.East:
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.North;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.South;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.West;
+                    if (currStamp.x == 0) {
+                        nextStampPos.x++;
+                    } else {
+                        if (currStamp.col < (maxCols - 1)) {
+                            nextStampPos.col++;
+                            nextStampPos.x = 0;
+                        } else {
+                            nextStampPos = null;
+                        }
+                    }
+                    if (nextStampPos) nextStampPieces.push(nextStampPos);
+                    break;
+
+                case TRIANGLE_POS.South:
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.East;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.West;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.North;
+                    if (currStamp.y == 0) {
+                        nextStampPos.y++;
+                    } else {
+                        if (currStamp.row < (maxRows - 1)) {
+                            nextStampPos.row++;
+                            nextStampPos.y = 0;
+                        } else {
+                            nextStampPos = null;
+                        }
+                    }
+                    if (nextStampPos) nextStampPieces.push(nextStampPos);
+                    break;
+
+                case TRIANGLE_POS.West:
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.South;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.North;
+                    nextStampPieces.push(nextStampPos);
+
+                    nextStampPos = clone(currStamp);
+                    nextStampPos.piece = TRIANGLE_POS.East;
+                    if (currStamp.x > 0) {
+                        nextStampPos.x--;
+                    } else {
+                        if (currStamp.col > 0) {
+                            nextStampPos.col--;
+                            nextStampPos.x = 1;
+                        } else {
+                            nextStampPos = null;
+                        }
+                    }
+                    if (nextStampPos) nextStampPieces.push(nextStampPos);
+                    break;
+
+                default:
+                    log("Invalid piece");
+                    nextStampPieces = null;
+                    break;
+            }
+
+            return nextStampPieces;
+        }
+
+        function filterTrianglePos(triangleString, pos) {
+            let triString = "notFound";
+            switch (pos) {
+                case TRIANGLE_POS.North:
+                    triString = "N";
+                    break;
+                case TRIANGLE_POS.East:
+                    triString = "E";
+                    break;
+                case TRIANGLE_POS.South:
+                    triString = "S";
+                    break;
+                case TRIANGLE_POS.West:
+                    triString = "W";
+                    break;
+                default:
+                    log("Invalid triangle Pos");
+                    break;
+            }
+
+            let foundPos = triangleString.indexOf(triString);
+            let found = (foundPos >= 0);
+            return found;
+        }
+
+        function GroupData(numCols, numRows) {
+            this.currentGroup = 0;
+            this.numCols = numCols;
+            this.numRows = numRows;
+
+            this.isNewGroup = true;
+
+            this.groups = [];
+
+            this.addGroup = function () {
+                this.currentGroup++;
+                this.isNewGroup = false;
+
+                let newGroup = new Group(this.currentGroup);
+                this.groups.push(newGroup);
+
+                return newGroup;
+            };
+
+            this.addStampToGroup = function (currStamp) {
+                if (this.isNewGroup) {
+                    this.addGroup();
+                }
+
+                let newGroupStamp = clone(currStamp);
+                let numGroups = this.groups.length;
+                let currGroup = this.groups[numGroups - 1];
+                currGroup.groupStamps.push(newGroupStamp);
+            };
+
+            this.checkIfStampInGroup = function (currStamp) {
+                let numGroups = this.groups.length;
+                let currGroup = this.groups[numGroups - 1];
+
+                let found = currGroup.groupStamps.includes(currStamp);
+
+                return found;
+            };
+
+            return this;
+        }
+
+        function StampPos(col, row, x, y, piece) {
+            this.col = col || 0;
+            this.row = row || 0;
+            this.x = x || 0;
+            this.y = y || 0;
+            this.piece = piece || 0;
+
+            return this;
+        }
+
+        function Group(num) {
+            this.groupNum = num;
+            this.groupStamps = [];
+        }
+
+    </script>
 </head>
 <body>
     <div>
@@ -620,7 +1022,8 @@
             <option value="5">5</option>
             <option value="6">6</option>
         </select>
-        <button onclick="init();">Generate</button>
+        <button onclick="init();">Generate</button>&nbsp;
+        <button onclick="findAllGroups();">Find Groups</button>
     </div>
     <div>
         <canvas id="canvasElem" width="1100" height="1100"></canvas>

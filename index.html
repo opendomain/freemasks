@@ -42,23 +42,24 @@
         };
 
         const _faceColors = [
-            //            "aqua",
-            "black",
-            "blue",
-            "fuchsia",
             "gray",
             "green",
-            "lime",
             "maroon",
             "navy",
             "olive",
             "orange",
-            "purple",
-            "red",
             "silver",
             "teal",
+            //            
+            "aqua",
+            "black",
+            "blue",
+            "lime",
             "white",
-            "yellow"
+            "yellow",
+            "fuchsia",
+            "purple",
+            "red",
         ];
 
         const _numFaceColors = _faceColors.length;
@@ -232,8 +233,11 @@
 
                                 fillColor = face.color;
                                 if (showSecondColor) {
-                                    // Zedric use group color
-                                    fillColor = face.color;
+                                    // Zedric use piece num
+                                    for (let p = 0; p < _numPiecesInStamp; p++) {
+                                        fillColor = face.getPieceColor(x, y, p);
+                                        if (fillColor != "black") break;
+                                    }
                                 }
                                 drawShape(trianglePoints, lineColor, fillColor);
                             }
@@ -312,6 +316,19 @@
                 piece.visited = visited;
             };
 
+            this.getPieceColor = function (x, y, p) {
+                let stmp = getStamp(x, y);
+                let piece = stmp.pieces[p];
+                let color = piece.color;
+                return color;
+            };
+
+            this.setPieceColor = function (x, y, p, color) {
+                let stmp = getStamp(x, y);
+                let piece = stmp.pieces[p];
+                piece.color = color;
+            }
+
             this.init();
 
             return this;
@@ -341,6 +358,7 @@
             this.pieceNum = num;
             //this.isOn = false;
             this.visited = undefined;
+            this.color = "black";
             return this;
         }
 
@@ -729,6 +747,7 @@
                             for (let piece = 0; piece < _numPiecesInStamp; piece++) {
 
                                 face.setStampVisited(x, y, piece, false);
+                                face.setPieceColor(x, y, piece, "black");
                             }
                         }
                     }
@@ -736,7 +755,6 @@
             }
 
             let grpData = new GroupData(numCols, numRows);
-            _loopNum = 0;
 
             for (let row = 0; row < numRows; row++) {
                 for (let col = 0; col < numCols; col++) {
@@ -765,6 +783,22 @@
 
             console.log("----------------");
             console.log(grpData);
+
+            var elemOutout = document.getElementById("txtGroupData");
+            elemOutout.value = JSON.stringify(grpData);
+
+            for (let grp = 0; grp < grpData.groups.length; grp++) {
+                let groupColor = _faceColors[grp];
+                let currGroup = grpData.groups[grp];
+                for (let stm = 0; stm < currGroup.groupStamps.length; stm++) {
+                    let currStmp = currGroup.groupStamps[stm];
+                    let face = _mainScreen.getFace(currStmp.col, currStmp.row);
+
+                    face.setPieceColor(currStmp.x, currStmp.y, currStmp.piece, groupColor);
+                }
+            }
+
+            _mainScreen.display(true);
         }
 
         function stampCheckHash(currStamp) {
@@ -778,12 +812,7 @@
             return stmpHash;
         }
 
-        var _loopNum = 0;
-
         function findGroups(screen, grpData, currStamp) {
-            console.log("loop: " + _loopNum++);
-            console.log(grpData);
-
             var  face = screen.getFace(currStamp.col, currStamp.row);
             var  visited = face.getStampVisited(currStamp.x, currStamp.y, currStamp.piece);
 
@@ -810,8 +839,6 @@
                     }
                 }
             }
-
-            _loopNum--;
 
         }
 
@@ -1024,6 +1051,9 @@
         </select>
         <button onclick="init();">Generate</button>&nbsp;
         <button onclick="findAllGroups();">Find Groups</button>
+    </div>
+    <div>
+        <textarea cols="80" rows="10" id="txtGroupData">Test</textarea>
     </div>
     <div>
         <canvas id="canvasElem" width="1100" height="1100"></canvas>

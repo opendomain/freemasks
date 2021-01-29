@@ -41,5 +41,5 @@ function getCanvas() {
         _ctx2.rect(0, 0, _canvasWidth2, _canvasHeight2);
         _ctx2.fill();
     }
-
 }
+//////////////////////////////

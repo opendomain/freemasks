@@ -120,6 +120,9 @@
 
             loadScreen(_mainScreen);
 
+            var elemOutout = document.getElementById("txtScreenData");
+            elemOutout.value = JSON.stringify(_mainScreen);
+
             _mainScreen.display(false);
         }
 
@@ -170,10 +173,10 @@
             let screen = {
                 width: undefined,
                 height: undefined,
-                faces: []
             };
 
             this.id = id;
+            this.screenFaces = [];
 
             this.init = function (width, height) {
                 screen.width = width;
@@ -190,7 +193,7 @@
                     newFaces.push(newRow);
                 }
 
-                screen.faces = newFaces;
+                this.screenFaces = newFaces;
             };
 
             this.getWidth = function () {
@@ -202,7 +205,7 @@
             };
 
             this.getFace = function (col, row) {
-                let faceRow = screen.faces[row];
+                let faceRow = this.screenFaces[row];
                 if (!faceRow) {
                     alert('Invalid Face row');
                 }
@@ -286,6 +289,10 @@
             this.row = row;
             this.color = undefined;
             this.backColor = undefined;
+
+            this.cubeOrder = -1;
+            this.cubeFaceId = -1;
+            this.cubeRotation = -1;
 
             let face = {
                 stamps: [],
@@ -462,13 +469,19 @@
                     face.color = cubeFrontFace.color;
                     face.backColor = cubeBackFace.color;
 
-                    rotation = Math.floor(Math.random() * _numRotations) * 90;
-                    //rotation = cubeFrontFace.imageOrientation;
+                    let randRotation = Math.floor(Math.random() * _numRotations) * 90;
+
+                    rotation = (cubeFrontFace.imageOrientation + randRotation) % 360;
+
+                    face.cubeOrder = cube.order;
+                    face.cubeFaceId = cubeFrontFace.id;
+                    face.cubeRotation = rotation;
 
                     faceStampNum = getFaceNumFromImage(cubeFaceFrontImage, rotation);
                     setFaceStamps(face, faceStampNum);
 
-                    faceStampBackNum = getFaceNumFromImage(cubeFaceBackImage, rotation);
+                    let backRotation = (cubeBackFace.imageOrientation + randRotation + 180 ) % 360;
+                    faceStampBackNum = getFaceNumFromImage(cubeFaceBackImage, backRotation);
                     setFaceStamps(face, faceStampBackNum, useBack);
                 }
             }
@@ -1127,12 +1140,19 @@
             <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
-            <option value="5">5</option>
+            <option value="5" selected="selected">5</option>
             <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+            <option value="11">11</option>
+            <option value="12">12</option>
         </select>
         <button onclick="init();">Generate</button>&nbsp;
         <button onclick="findAllGroups();">Find Groups</button>
-        <textarea cols="60" rows="2" id="txtGroupData">Test</textarea>
+        <textarea cols="30" rows="2" id="txtScreenData"></textarea>
+        <textarea cols="30" rows="2" id="txtGroupData"></textarea>
     </div>
     <div>
         <canvas id="canvasElem" width="750" height="375"></canvas>

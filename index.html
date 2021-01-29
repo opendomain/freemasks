@@ -16,10 +16,11 @@
 
         var _cubeWorld;
         var _baseCopy;
+        var _backCopy;
 
         const _xOffset = 5;
         const _yOffset = 5;
-        const _size = 100;
+        const _size = 90;
         const _half = Math.ceil(_size / 2);
         const _cubeSpace = 5;
         const _lineWidth = 1;
@@ -50,7 +51,7 @@
             "orange",
             "silver",
             "teal",
-            //            
+            //
             "aqua",
             "black",
             "blue",
@@ -61,6 +62,15 @@
             "purple",
             "red",
         ];
+
+        const _faceNumbers = {
+            "Front": 4,
+            "Left": 1,
+            "Right": 0,
+            "Top": 2,
+            "Bottom": 3,
+            "Back": 5
+        };
 
         const _numFaceColors = _faceColors.length;
 
@@ -99,6 +109,7 @@
             _maxSearchNonBlankFace = elemRotate.options[elemRotate.selectedIndex].value;
 
             _baseCopy = clone(_baseset);
+            _backCopy = clone(_baseset);
 
             //_cubeWorld = new CubeWorld();
             //let screen = _cubeWorld.getScreen(screenNum);
@@ -204,6 +215,7 @@
 
             this.display = function (showSecondColor) {
                 let triangleString;
+                let triangleStringBack;
                 let centerPoint;
 
                 let lineColorOutline = "black";
@@ -214,6 +226,8 @@
 
                 let outlinePoints;
                 let trianglePoints;
+                let trianglePointsBack;
+                let useBack = true;
 
                 for (let row = 0; row < screen.height; row++) {
                     for (let col = 0; col < screen.width; col++) {
@@ -223,13 +237,18 @@
                                 centerPoint = calculateCenterPoint(col, row, x, y);
 
                                 outlinePoints = makeOutlinePoints(centerPoint);
-                                drawShape(outlinePoints, lineColorOutline, fillColorOutline);
+
+                                drawShape(outlinePoints, lineColorOutline, fillColorOutline, _ctx);
+                                drawShape(outlinePoints, lineColorOutline, fillColorOutline, _ctx2);
 
                                 //let stampNum = face.getStampNum(x, y);
                                 //triangleString = getTriangleString(stampNum);
 
                                 triangleString = face.getTriangles(x, y);
                                 trianglePoints = makeTrianglePoints(triangleString, centerPoint);
+
+                                triangleStringBack = face.getTriangles(x, y, useBack);
+                                trianglePointsBack = makeTrianglePoints(triangleStringBack, centerPoint);
 
                                 fillColor = face.color;
                                 if (showSecondColor) {
@@ -239,7 +258,18 @@
                                         if (fillColor != "black") break;
                                     }
                                 }
-                                drawShape(trianglePoints, lineColor, fillColor);
+                                drawShape(trianglePoints, lineColor, fillColor, _ctx);
+
+                                fillColor = face.backColor;
+                                if (showSecondColor) {
+                                    // Zedric use piece num
+                                    for (let p = 0; p < _numPiecesInStamp; p++) {
+                                        fillColor = face.getPieceColor(x, y, p, useBack);
+                                        if (fillColor != "black") break;
+                                    }
+                                }
+                                drawShape(trianglePointsBack, lineColor, fillColor, _ctx2);
+
                             }
                         }
                     }
@@ -255,14 +285,20 @@
             this.col = col;
             this.row = row;
             this.color = undefined;
+            this.backColor = undefined;
 
             let face = {
-                stamps: []
+                stamps: [],
+                backStamps: []
             };
 
 
-            function getStamp(x, y) {
+            function getStamp(x, y, useBack) {
                 let stampRow = face.stamps[y];
+                if (useBack) {
+                    stampRow = face.backStamps[y];
+                } 
+
                 if (!stampRow) {
                     alert('Invalid stampRow');
                 }
@@ -275,56 +311,63 @@
 
             this.init = function () {
                 let newStamps = [];
+                let newBackStamps = [];
                 for (let r = 0; r < _numStampsInRowOrCol; r++) {
                     let newRow = [];
+                    let newBackRow = [];
                     for (let c = 0; c < _numStampsInRowOrCol; c++) {
                         let newStamp = new Stamp(c, r);
                         newRow.push(newStamp);
+
+                        let newBackStamp = new Stamp(c, r);
+                        newBackRow.push(newBackStamp);
                     }
                     newStamps.push(newRow);
+                    newBackStamps.push(newBackRow);
                 }
                 face.stamps = newStamps;
+                face.backStamps = newBackStamps;
             };
 
-            this.getStampNum = function (x, y) {
-                let stmp = getStamp(x, y);
+            this.getStampNum = function (x, y, useBack) {
+                let stmp = getStamp(x, y, useBack);
                 return stmp.stampNum;
             };
 
-            this.setStampNum = function (x, y, num) {
+            this.setStampNum = function (x, y, num, useBack) {
                 if (typeof (num) != 'number') log('Invalid stampNum');
-                let stmp = getStamp(x, y);
+                let stmp = getStamp(x, y, useBack);
                 stmp.stampNum = num;
                 stmp.triangles = getTriangleString(num);
             };
 
-            this.getTriangles = function (x, y) {
-                let stmp = getStamp(x, y);
+            this.getTriangles = function (x, y, useBack) {
+                let stmp = getStamp(x, y, useBack);
                 return stmp.triangles;
             };
 
-            this.getStampVisited = function (x, y, p) {
-                let stmp = getStamp(x, y);
+            this.getStampVisited = function (x, y, p, useBack) {
+                let stmp = getStamp(x, y, useBack);
                 let piece = stmp.pieces[p];
                 return piece.visited;
             };
 
-            this.setStampVisited = function (x, y, p, visited) {
+            this.setStampVisited = function (x, y, p, visited, useBack) {
                 if (typeof (visited) != 'boolean') log('Invalid visited type');
-                let stmp = getStamp(x, y);
+                let stmp = getStamp(x, y, useBack);
                 let piece = stmp.pieces[p];
                 piece.visited = visited;
             };
 
-            this.getPieceColor = function (x, y, p) {
-                let stmp = getStamp(x, y);
+            this.getPieceColor = function (x, y, p, useBack) {
+                let stmp = getStamp(x, y, useBack);
                 let piece = stmp.pieces[p];
                 let color = piece.color;
                 return color;
             };
 
-            this.setPieceColor = function (x, y, p, color) {
-                let stmp = getStamp(x, y);
+            this.setPieceColor = function (x, y, p, color, useBack) {
+                let stmp = getStamp(x, y, useBack);
                 let piece = stmp.pieces[p];
                 piece.color = color;
             }
@@ -368,14 +411,20 @@
             let randCubeNum;
             let cube;
             let numFaces;
-            let cubeFaceImage;
             let faceStampNum;
+            let faceStampBackNum;
             let rotation;
 
             let faceColorNum;
             let faceColor;
 
-            let cubeFace;
+            let cubeFrontFace;
+            let cubeFaceFrontImage;
+            let cubeBackFaceNum;
+            let cubeBackFace;
+            let cubeFaceBackImage;
+
+            let useBack = true;
 
             let numCols = screen.getWidth();
             let numRows = screen.getHeight();
@@ -394,30 +443,72 @@
                     let faceNumMod = 0;
                     do {
                         faceNumMod = (faceNum + numSearchNonBlankFace) % numFaces;
-                        cubeFace = cube.faces[faceNumMod];
-                        cubeFaceImage = cubeFace.image;
+                        cubeFrontFace = cube.faces[faceNumMod];
+                        cubeFaceFrontImage = cubeFrontFace.image;
 
-                        if (cubeFaceImage != "blank") {
+                        cubeBackFaceNum = getBackFace(faceNumMod);
+                        cubeBackFace = cube.faces[cubeBackFaceNum];
+                        cubeFaceBackImage = cubeBackFace.image;
+
+                        if ((cubeFaceFrontImage != "blank") && (cubeFaceBackImage != "blank") )  {
                             break;
                         }
                         numSearchNonBlankFace++;
                     } while (numSearchNonBlankFace < _maxSearchNonBlankFace);
 
-                    faceColorNum = Math.floor(Math.random() * _numFaceColors);
-                    faceColor = _faceColors[faceColorNum];
-                    face.color = faceColor;
-                    face.color = cubeFace.color;
+                    //faceColorNum = Math.floor(Math.random() * _numFaceColors);
+                    //faceColor = _faceColors[faceColorNum];
+                    //face.color = faceColor;
+                    face.color = cubeFrontFace.color;
+                    face.backColor = cubeBackFace.color;
 
                     rotation = Math.floor(Math.random() * _numRotations) * 90;
-                    rotation = cubeFace.imageOrientation;
+                    //rotation = cubeFrontFace.imageOrientation;
 
-                    faceStampNum = getFaceNumFromImage(cubeFaceImage, rotation);
-
+                    faceStampNum = getFaceNumFromImage(cubeFaceFrontImage, rotation);
                     setFaceStamps(face, faceStampNum);
+
+                    faceStampBackNum = getFaceNumFromImage(cubeFaceBackImage, rotation);
+                    setFaceStamps(face, faceStampBackNum, useBack);
                 }
             }
 
             return screen;
+        }
+
+        function getBackFace(frontFace) {
+            let backFace = -1;
+
+            switch (frontFace) {
+                case _faceNumbers.Front:
+                    backFace = _faceNumbers.Back;
+                    break;
+
+                case _faceNumbers.Back:
+                    backFace = _faceNumbers.Front;
+                    break;
+
+                case _faceNumbers.Left:
+                    backFace = _faceNumbers.Right;
+                    break;
+
+                case _faceNumbers.Right:
+                    backFace = _faceNumbers.Left;
+                    break;
+
+                case _faceNumbers.Top:
+                    backFace = _faceNumbers.Bottom;
+                    break;
+
+                case _faceNumbers.Bottom:
+                    backFace = _faceNumbers.Top;
+                    break;
+
+                default:
+                    alert('Invalid frontFace');
+                    break;
+            }
+            return backFace;
         }
 
         function getFaceNumFromImage(faceImage, rotation) {
@@ -492,79 +583,79 @@
 
         }
 
-        function setFaceStamps(face, faceNum) {
+        function setFaceStamps(face, faceNum, useBack) {
             let stamp;
             switch (faceNum) {
                 case _goodFaces.blank:
-                    face.setStampNum(0, 0, _triangleName.blank);
-                    face.setStampNum(0, 1, _triangleName.blank);
-                    face.setStampNum(1, 0, _triangleName.blank);
-                    face.setStampNum(1, 1, _triangleName.blank);
+                    face.setStampNum(0, 0, _triangleName.blank, useBack);
+                    face.setStampNum(0, 1, _triangleName.blank, useBack);
+                    face.setStampNum(1, 0, _triangleName.blank, useBack);
+                    face.setStampNum(1, 1, _triangleName.blank, useBack);
 
                     break;
 
                 case _goodFaces.block:
-                    face.setStampNum(0, 0, _triangleName.block);
-                    face.setStampNum(0, 1, _triangleName.block);
-                    face.setStampNum(1, 0, _triangleName.block);
-                    face.setStampNum(1, 1, _triangleName.block);
+                    face.setStampNum(0, 0, _triangleName.block, useBack);
+                    face.setStampNum(0, 1, _triangleName.block, useBack);
+                    face.setStampNum(1, 0, _triangleName.block, useBack);
+                    face.setStampNum(1, 1, _triangleName.block, useBack);
 
                     break;
 
                 case _goodFaces.triangle_topLeft:
-                    face.setStampNum(0, 0, _triangleName.block);
-                    face.setStampNum(0, 1, _triangleName.topLeft);
-                    face.setStampNum(1, 0, _triangleName.topLeft);
-                    face.setStampNum(1, 1, _triangleName.blank);
+                    face.setStampNum(0, 0, _triangleName.block, useBack);
+                    face.setStampNum(0, 1, _triangleName.topLeft, useBack);
+                    face.setStampNum(1, 0, _triangleName.topLeft, useBack);
+                    face.setStampNum(1, 1, _triangleName.blank, useBack);
                     break;
 
                 case _goodFaces.triangle_topRight:
-                    face.setStampNum(0, 0, _triangleName.topRight);
-                    face.setStampNum(0, 1, _triangleName.blank);
-                    face.setStampNum(1, 0, _triangleName.block);
-                    face.setStampNum(1, 1, _triangleName.topRight);
+                    face.setStampNum(0, 0, _triangleName.topRight, useBack);
+                    face.setStampNum(0, 1, _triangleName.blank, useBack);
+                    face.setStampNum(1, 0, _triangleName.block, useBack);
+                    face.setStampNum(1, 1, _triangleName.topRight, useBack);
                     break;
 
                 case _goodFaces.triangle_bottomRight:
-                    face.setStampNum(0, 0, _triangleName.blank);
-                    face.setStampNum(0, 1, _triangleName.bottomRight);
-                    face.setStampNum(1, 0, _triangleName.bottomRight);
-                    face.setStampNum(1, 1, _triangleName.block);
+                    face.setStampNum(0, 0, _triangleName.blank, useBack);
+                    face.setStampNum(0, 1, _triangleName.bottomRight, useBack);
+                    face.setStampNum(1, 0, _triangleName.bottomRight, useBack);
+                    face.setStampNum(1, 1, _triangleName.block, useBack);
                     break;
 
                 case _goodFaces.triangle_bottomLeft:
-                    face.setStampNum(0, 0, _triangleName.bottomLeft);
-                    face.setStampNum(0, 1, _triangleName.block);
-                    face.setStampNum(1, 0, _triangleName.blank);
-                    face.setStampNum(1, 1, _triangleName.bottomLeft);
+                    face.setStampNum(0, 0, _triangleName.bottomLeft, useBack);
+                    face.setStampNum(0, 1, _triangleName.block, useBack);
+                    face.setStampNum(1, 0, _triangleName.blank, useBack);
+                    face.setStampNum(1, 1, _triangleName.bottomLeft, useBack);
                     break;
 
                 case _goodFaces.rectangle_left:
-                    face.setStampNum(0, 0, _triangleName.block);
-                    face.setStampNum(0, 1, _triangleName.blank);
-                    face.setStampNum(1, 0, _triangleName.block);
-                    face.setStampNum(1, 1, _triangleName.blank);
+                    face.setStampNum(0, 0, _triangleName.block, useBack);
+                    face.setStampNum(0, 1, _triangleName.blank, useBack);
+                    face.setStampNum(1, 0, _triangleName.block, useBack);
+                    face.setStampNum(1, 1, _triangleName.blank, useBack);
                     break;
 
                 case _goodFaces.rectangle_top:
-                    face.setStampNum(0, 0, _triangleName.block);
-                    face.setStampNum(0, 1, _triangleName.block);
-                    face.setStampNum(1, 0, _triangleName.blank);
-                    face.setStampNum(1, 1, _triangleName.blank);
+                    face.setStampNum(0, 0, _triangleName.block, useBack);
+                    face.setStampNum(0, 1, _triangleName.block, useBack);
+                    face.setStampNum(1, 0, _triangleName.blank, useBack);
+                    face.setStampNum(1, 1, _triangleName.blank, useBack);
                     break;
 
                 case _goodFaces.rectangle_right:
-                    face.setStampNum(0, 0, _triangleName.blank);
-                    face.setStampNum(0, 1, _triangleName.block);
-                    face.setStampNum(1, 0, _triangleName.blank);
-                    face.setStampNum(1, 1, _triangleName.block);
+                    face.setStampNum(0, 0, _triangleName.blank, useBack);
+                    face.setStampNum(0, 1, _triangleName.block, useBack);
+                    face.setStampNum(1, 0, _triangleName.blank, useBack);
+                    face.setStampNum(1, 1, _triangleName.block, useBack);
                     break;
 
                 case _goodFaces.rectangle_bottom:
-                    face.setStampNum(0, 0, _triangleName.blank);
-                    face.setStampNum(0, 1, _triangleName.blank);
-                    face.setStampNum(1, 0, _triangleName.block);
-                    face.setStampNum(1, 1, _triangleName.block);
+                    face.setStampNum(0, 0, _triangleName.blank, useBack);
+                    face.setStampNum(0, 1, _triangleName.blank, useBack);
+                    face.setStampNum(1, 0, _triangleName.block, useBack);
+                    face.setStampNum(1, 1, _triangleName.block, useBack);
                     break;
 
                 default:
@@ -689,35 +780,37 @@
             return points;
         }
 
-        function drawShape(points, lineColour, fillColour) {
+        function drawShape(points, lineColour, fillColour, ctxIn) {
             let currPoint;
 
             let xPos;
             let yPos;
 
+            let ctx = ctxIn || _ctx;
+
             if ((lineColour === undefined) || (lineColour == "")) lineColour = "black";
             if ((fillColour === undefined) || (fillColour == "")) fillColour = "clear";
 
-            _ctx.strokeStyle = lineColour;
-            _ctx.lineWidth = _lineWidth;
-            _ctx.beginPath();
+            ctx.strokeStyle = lineColour;
+            ctx.lineWidth = _lineWidth;
+            ctx.beginPath();
             for (let pNum = 0; pNum < points.length; pNum++) {
                 currPoint = points[pNum];
                 xPos = currPoint.x;
                 yPos = currPoint.y;
 
                 if (pNum == 0) {
-                    _ctx.moveTo(xPos, yPos);
+                    ctx.moveTo(xPos, yPos);
                 } else {
-                    _ctx.lineTo(xPos, yPos);
+                    ctx.lineTo(xPos, yPos);
                 }
             }
-            _ctx.closePath();
-            _ctx.stroke();
+            ctx.closePath();
+            ctx.stroke();
 
             if (fillColour != "clear") {
-                _ctx.fillStyle = fillColour;
-                _ctx.fill();
+                ctx.fillStyle = fillColour;
+                ctx.fill();
             }
         }
 
@@ -801,33 +894,22 @@
             _mainScreen.display(true);
         }
 
-        function stampCheckHash(currStamp) {
-            let stmpHash = "";
-            stmpHash += "C" + currStamp.col;
-            stmpHash += "R" + currStamp.row;
-            stmpHash += "x" + currStamp.x;
-            stmpHash += "y" + currStamp.y;
-            stmpHash += "p" + currStamp.piece;
-
-            return stmpHash;
-        }
-
         function findGroups(screen, grpData, currStamp) {
-            var  face = screen.getFace(currStamp.col, currStamp.row);
-            var  visited = face.getStampVisited(currStamp.x, currStamp.y, currStamp.piece);
+            var face = screen.getFace(currStamp.col, currStamp.row);
+            var visited = face.getStampVisited(currStamp.x, currStamp.y, currStamp.piece);
 
             if (!visited) {
                 visited = true;
                 face.setStampVisited(currStamp.x, currStamp.y, currStamp.piece, visited);
 
-                var  triangleString = face.getTriangles(currStamp.x, currStamp.y);
-                var  pieceNum = currStamp.piece;
-                var  currentTriangleIsOn = filterTrianglePos(triangleString, pieceNum);
+                var triangleString = face.getTriangles(currStamp.x, currStamp.y);
+                var pieceNum = currStamp.piece;
+                var currentTriangleIsOn = filterTrianglePos(triangleString, pieceNum);
 
                 if (currentTriangleIsOn) {
                     grpData.addStampToGroup(currStamp);
 
-                    var  nextStampPosList = getNextStampPieces(currStamp, grpData.numCols, grpData.numRows);
+                    var nextStampPosList = getNextStampPieces(currStamp, grpData.numCols, grpData.numRows);
                     if (nextStampPosList == null) return;
 
                     for (var stmp = 0; stmp < nextStampPosList.length; stmp++) {
@@ -1035,7 +1117,6 @@
             this.groupNum = num;
             this.groupStamps = [];
         }
-
     </script>
 </head>
 <body>
@@ -1051,12 +1132,13 @@
         </select>
         <button onclick="init();">Generate</button>&nbsp;
         <button onclick="findAllGroups();">Find Groups</button>
+        <textarea cols="60" rows="2" id="txtGroupData">Test</textarea>
     </div>
     <div>
-        <textarea cols="80" rows="10" id="txtGroupData">Test</textarea>
+        <canvas id="canvasElem" width="750" height="375"></canvas>
     </div>
     <div>
-        <canvas id="canvasElem" width="1100" height="1100"></canvas>
+        <canvas id="canvasElem2" width="750" height="375"></canvas>
     </div>
     <script>init()</script>
 
